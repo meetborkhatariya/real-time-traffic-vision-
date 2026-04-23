@@ -1,0 +1,9 @@
+# custom_tracker.yaml
+# Advanced configuration to solve "Tracker Flicker" and ID skipping
+
+tracker_type: bytetrack  # Use ByteTrack for speed and robustness
+track_high_thresh: 0.6   # (Default 0.5) Stricter threshold to associate a detection with a track
+track_low_thresh: 0.1    # Threshold for the second association (lower confidence)
+new_track_thresh: 0.7    # (Default 0.6) Make it very strict to create a BRAND NEW ID
+track_buffer: 150        # (Default 30) Remember lost cars for 150 frames (~5 seconds) if they go behind trees
+match_thresh: 0.8        # Threshold for matching tracks to detections
