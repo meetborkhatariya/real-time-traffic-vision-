@@ -193,22 +193,24 @@ async def process_webcam(conf: float = 0.35):
         crossed_ids = set()
         track_history = {}
         
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-            annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
-            if new_events:
-                db = SessionLocal()
-                for event in new_events:
-                    db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
-                    db.add(db_event)
-                db.commit()
-                db.close()
-                
-            cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            ret, buffer = cv2.imencode('.jpg', annotated_frame)
-            if not ret: continue
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        cap.release()
+        try:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
+                if new_events:
+                    db = SessionLocal()
+                    for event in new_events:
+                        db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
+                        db.add(db_event)
+                    db.commit()
+                    db.close()
+                    
+                cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                ret, buffer = cv2.imencode('.jpg', annotated_frame)
+                if not ret: continue
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        finally:
+            cap.release()
     return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
