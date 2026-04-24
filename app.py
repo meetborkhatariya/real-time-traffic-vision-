@@ -138,7 +138,7 @@ def play_mjpeg_stream(url, method="post", kwargs=None):
 # Restored Image Tab via API
 with tab1:
     st.markdown("### Process Images via API Endpoint")
-    up_img = st.file_uploader("", type=["jpg", "png", "jpeg"], key="img_up")
+    up_img = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], key="img_up", label_visibility="collapsed")
     if up_img:
         st.image(up_img, caption="Frontend Original", width=300)
         if st.button("Send to Deep Learning API"):
@@ -156,7 +156,7 @@ with tab1:
 # Video Upload
 with tab2:
     st.markdown("### Process Video via API")
-    up_vid = st.file_uploader("", type=["mp4", "avi", "mov"], key="vid_up")
+    up_vid = st.file_uploader("Upload Video", type=["mp4", "avi", "mov"], key="vid_up", label_visibility="collapsed")
     if up_vid:
         if st.button("🚀 Analyze Video"):
             file_obj = {"file": (up_vid.name, up_vid.getvalue(), up_vid.type)}
