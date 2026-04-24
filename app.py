@@ -33,7 +33,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = "https://traffic-vision-backend.onrender.com"
 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2965/2965214.png", width=100)
