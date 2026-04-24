@@ -3,7 +3,7 @@
 A production-ready computer vision architecture designed for real-time traffic management. This project moves beyond simple scripting by implementing a **Microservice Architecture** separating the deep learning engine (FastAPI) from the user interface (Streamlit) while persisting analytics data (SQLite/SQLAlchemy).
 
 ## 🌟 Architectural Features
-- **FastAPI Backend Core**: A RESTful and WebSocket API layer that wraps the YOLOv8 neural network.
+- **Standalone AI Engine (FastAPI Backend)**: A RESTful and WebSocket API layer that wraps the YOLOv8 neural network, allowing any external application to request deep learning video analytics via REST API.
 - **Decoupled Streamlit Dashboard**: A lightweight frontend that authenticates and consumes the API without doing any heavy deep learning locally.
 - **SQL Data Pipeline**: Uses SQLAlchemy ORM to log every single vehicle crossing, timestamp, and class into an SQLite database for business intelligence.
 - **Dynamic Hot-Swapping**: Ability to hot-swap YOLO weights (Nano vs Large) via an API `POST` request without restarting the server.
@@ -22,15 +22,26 @@ By persisting tracking metadata to an SQLite database (`traffic_analytics.db`), 
 - **Vehicle Classification**: Distinguishes between Cars, Trucks, Motorcycles, and Buses.
 - **State Preservation**: The backend maintains event logs even if the frontend crashes or goes offline.
 
-## 🚀 Installation & Setup
+## 🚀 Cloud Deployment (Production)
 
-This project requires spinning up two microservices.
+This project is fully deployed to the cloud using an Infrastructure as Code (IaC) approach.
+- **Frontend**: Deployed on [Streamlit Cloud](https://streamlit.io/cloud).
+- **Backend API**: Deployed as a Web Service on [Render](https://render.com) using a `render.yaml` Blueprint.
+
+To deploy your own version:
+1. Connect your GitHub to Render and use the provided `render.yaml` to spin up the FastAPI backend automatically.
+2. Copy the resulting Render URL and update `API_URL` in `app.py`.
+3. Deploy the Streamlit app to Streamlit Cloud.
+
+## 💻 Local Installation & Setup
+
+If you wish to run the microservices locally on your machine:
 
 ### 1. Start the API Engine (Backend)
 Navigate to the `backend` directory and launch the FastAPI server.
 ```bash
 # Install dependencies
-pip install fastapi uvicorn sqlalchemy opencv-python-headless ultralytics numpy
+pip install -r backend/requirements.txt
 
 # Start the server on port 8000
 cd backend
@@ -41,7 +52,7 @@ python -m uvicorn main:app --port 8000 --reload
 Open a new terminal window / tab, stay in the root directory, and launch the Streamlit frontend.
 ```bash
 # Install dependencies
-pip install streamlit requests pandas
+pip install -r requirements.txt
 
 # Launch the UI
 streamlit run app.py
@@ -59,9 +70,10 @@ This project provides 4 different levels of AI intelligence to balance speed (FP
 
 ## 🛠️ Performance Tech Stack
 - **AI Core**: YOLOv8 (Ultralytics), OpenCV
-- **Backend**: Python 3.8+, FastAPI, Uvicorn (ASGI)
+- **Backend API**: Python, FastAPI, Uvicorn (ASGI)
 - **Database**: SQLite, SQLAlchemy ORM
-- **Frontend**: Streamlit, Requests, Pandas
+- **Frontend UI**: Streamlit, Requests, Pandas
+- **DevOps / Cloud**: Render (IaC Blueprint), Streamlit Cloud, Git
 - **Architecture**: Microservices, REST API, MJPEG Streaming
 
 ---
