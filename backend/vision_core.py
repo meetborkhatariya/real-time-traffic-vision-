@@ -23,15 +23,27 @@ class VisionService:
             self.current_model_name = model_name
 
     def process_image(self, img_np, conf_threshold=0.35):
-        """Processes a single static image."""
-        results = self.model(img_np, conf=conf_threshold, classes=self.vehicle_classes)
+        """Processes a single static image with downscaling optimization."""
+        # 1. Downscale if too large to save latency and memory
+        h, w = img_np.shape[:2]
+        max_dim = 1080
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            img_np = cv2.resize(img_np, (int(w * scale), int(h * scale)))
+
+        # 2. Run inference
+        results = self.model(img_np, conf=conf_threshold, classes=self.vehicle_classes, verbose=False)
+        
+        # 3. Generate annotated image
         annotated_img = results[0].plot()
+        
         boxes = results[0].boxes
         count = len(boxes)
         types = []
         if boxes.cls is not None:
              classes = boxes.cls.int().cpu().tolist()
              types = [self.model.names[c] for c in classes]
+             
         return annotated_img, count, types
 
     def process_frame(self, frame, line_y, crossed_ids, track_history, conf_threshold=0.35):

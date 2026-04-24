@@ -144,13 +144,26 @@ with tab1:
         st.image(up_img, caption="Frontend Original", width=300)
         if st.button("Send to Deep Learning API"):
             with st.spinner("Processing in cloud..."):
-                file_obj = {"file": (up_img.name, up_img.getvalue(), up_img.type)}
+                # Resize locally before upload to save bandwidth and reduce latency
+                img = Image.open(up_img)
+                max_size = 1280
+                if max(img.size) > max_size:
+                    ratio = max_size / max(img.size)
+                    new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                    img = img.resize(new_size, Image.LANCZOS)
+                
+                # Convert back to bytes
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=85)
+                img_bytes = buf.getvalue()
+
+                file_obj = {"file": (up_img.name, img_bytes, "image/jpeg")}
                 r = requests.post(f"{API_URL}/api/image/process?conf={conf_threshold}", files=file_obj, timeout=60)
                 if r.status_code == 200:
                     data = r.json()
                     st.success(f"Detections Finished: {data['count']} vehicles.")
-                    img_bytes = base64.b64decode(data['image'])
-                    st.image(Image.open(io.BytesIO(img_bytes)), caption="API Processed Result", use_column_width=True)
+                    img_bytes_res = base64.b64decode(data['image'])
+                    st.image(Image.open(io.BytesIO(img_bytes_res)), caption="API Processed Result", use_column_width=True)
                 else:
                     st.error(f"API Error ({r.status_code}): {r.text}")
 

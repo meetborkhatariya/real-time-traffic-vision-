@@ -90,8 +90,8 @@ async def process_image(file: UploadFile = File(...), conf: float = 0.35, db: Se
                 db.add(db_event)
             db.commit()
         
-        # Encode to base64
-        _, buffer = cv2.imencode('.jpg', annotated_img)
+        # Encode to base64 with compression
+        _, buffer = cv2.imencode('.jpg', annotated_img, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         img_str = base64.b64encode(buffer).decode("utf-8")
         
         return {"count": count, "image": img_str}
