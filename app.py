@@ -75,7 +75,7 @@ with st.sidebar:
     if st.button("Switch Backend Model"):
         if api_online:
             with st.spinner("Instructing backend to switch weights..."):
-                r = requests.post(f"{API_URL}/api/config/model", json={"model_name": model_map[model_choice]}, timeout=30)
+                r = requests.post(f"{API_URL}/api/config/model", json={"model_name": model_map[model_choice]}, timeout=120)
                 if r.status_code == 200:
                     st.success("Model updated successfully!")
         else:
