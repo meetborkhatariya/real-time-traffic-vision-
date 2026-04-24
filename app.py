@@ -49,7 +49,8 @@ with st.sidebar:
             api_online = True
             current_model = res.json().get("model", "Unknown")
         else:
-            st.warning("API Engine: UNSTABLE 🟡")
+            error_msg = res.json().get("message", "Unknown Error")
+            st.error(f"API Engine: ERROR 🔴\n\n{error_msg}")
     except (requests.ConnectionError, requests.Timeout):
         st.error("API Engine: OFFLINE 🔴")
         

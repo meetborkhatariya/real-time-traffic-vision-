@@ -23,7 +23,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-vision_service = VisionService(model_path="yolov8n.pt") 
+# Global vision service instance
+_vision_service = None
+
+def get_vision_service():
+    global _vision_service
+    if _vision_service is None:
+        print("Initializing VisionService for the first time...")
+        try:
+            _vision_service = VisionService(model_path="yolov8n.pt")
+        except Exception as e:
+            print(f"FATAL: Failed to initialize VisionService: {e}")
+            raise e
+    return _vision_service
 
 def get_db():
     db = SessionLocal()
@@ -40,13 +52,18 @@ class VideoUrl(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "model": vision_service.current_model_name}
+    try:
+        service = get_vision_service()
+        return {"status": "online", "model": service.current_model_name}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @app.post("/api/config/model")
 def update_model(config: ModelConfig):
     """Switch YOLO model version asynchronously."""
-    vision_service.switch_model(config.model_name)
-    return {"status": "success", "new_model": vision_service.current_model_name}
+    service = get_vision_service()
+    service.switch_model(config.model_name)
+    return {"status": "success", "new_model": service.current_model_name}
 
 @app.get("/api/analytics/summary")
 def get_analytics_summary(db: Session = Depends(get_db)):
@@ -81,7 +98,8 @@ async def process_image(file: UploadFile = File(...), conf: float = 0.35, db: Se
             return JSONResponse(status_code=400, content={"error": "Invalid image data"})
 
         print(f"Processing image with conf={conf}")
-        annotated_img, count, types = vision_service.process_image(img, conf_threshold=conf)
+        service = get_vision_service()
+        annotated_img, count, types = service.process_image(img, conf_threshold=conf)
         
         # Save to database
         if types:
@@ -127,7 +145,8 @@ async def process_video_stream(file: UploadFile = File(...), conf: float = 0.35)
                 ret, frame = cap.read()
                 if not ret: break
                     
-                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
+                service = get_vision_service()
+                annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
                 
                 if new_events:
                     db = SessionLocal()
@@ -177,7 +196,8 @@ async def process_video_url(payload: VideoUrl):
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
-                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=payload.conf)
+                service = get_vision_service()
+                annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=payload.conf)
                 if new_events:
                     db = SessionLocal()
                     try:
@@ -219,7 +239,8 @@ async def process_webcam(conf: float = 0.35):
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
-                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
+                service = get_vision_service()
+                annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
                 if new_events:
                     db = SessionLocal()
                     try:
