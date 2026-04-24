@@ -47,9 +47,15 @@ with st.sidebar:
         if res.status_code == 200:
             st.success("API Engine: ONLINE 🟢")
             api_online = True
-            current_model = res.json().get("model", "Unknown")
+            try:
+                current_model = res.json().get("model", "Unknown")
+            except:
+                current_model = "Unknown"
         else:
-            error_msg = res.json().get("message", "Unknown Error")
+            try:
+                error_msg = res.json().get("message", f"Status {res.status_code}")
+            except:
+                error_msg = f"Status {res.status_code}: {res.text[:100]}"
             st.error(f"API Engine: ERROR 🔴\n\n{error_msg}")
     except (requests.ConnectionError, requests.Timeout):
         st.error("API Engine: OFFLINE 🔴")
