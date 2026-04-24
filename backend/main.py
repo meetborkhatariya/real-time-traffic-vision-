@@ -70,74 +70,87 @@ def get_analytics_data(db: Session = Depends(get_db)):
     ]
 
 @app.post("/api/image/process")
-async def process_image(file: UploadFile = File(...), conf: float = 0.35):
+async def process_image(file: UploadFile = File(...), conf: float = 0.35, db: Session = Depends(get_db)):
     """Process a single image and return base64 string."""
-    contents = await file.read()
-    nparr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    annotated_img, count, types = vision_service.process_image(img, conf_threshold=conf)
-    
-    # Save to database
-    if types:
-        db = SessionLocal()
-        for v_type in types:
-            db_event = TrafficEvent(vehicle_type=v_type, track_id=0, direction="static_image")
-            db.add(db_event)
-        db.commit()
-        db.close()
-    
-    # Encode to base64
-    _, buffer = cv2.imencode('.jpg', annotated_img)
-    img_str = base64.b64encode(buffer).decode("utf-8")
-    
-    return {"count": count, "image": img_str}
+    try:
+        contents = await file.read()
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return JSONResponse(status_code=400, content={"error": "Invalid image data"})
+
+        print(f"Processing image with conf={conf}")
+        annotated_img, count, types = vision_service.process_image(img, conf_threshold=conf)
+        
+        # Save to database
+        if types:
+            for v_type in types:
+                db_event = TrafficEvent(vehicle_type=v_type, track_id=0, direction="static_image")
+                db.add(db_event)
+            db.commit()
+        
+        # Encode to base64
+        _, buffer = cv2.imencode('.jpg', annotated_img)
+        img_str = base64.b64encode(buffer).decode("utf-8")
+        
+        return {"count": count, "image": img_str}
+    except Exception as e:
+        print(f"Error in process_image: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/api/video/stream")
 async def process_video_stream(file: UploadFile = File(...), conf: float = 0.35):
     """Accepts a video file upload and returns a real-time MJPEG stream."""
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    content = await file.read()
-    tfile.write(content)
-    tfile.close() 
+    try:
+        content = await file.read()
+        tfile.write(content)
+        tfile.close() 
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Upload failed: {e}"})
     
     def generate_frames():
         cap = cv2.VideoCapture(tfile.name)
         if not cap.isOpened():
+            print(f"Failed to open video file: {tfile.name}")
             yield b""
             return
             
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         line_y = height // 2
         crossed_ids = set()
         track_history = {}
         
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
+        try:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                    
+                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
                 
-            annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
-            
-            if new_events:
-                db = SessionLocal()
-                for event in new_events:
-                    db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
-                    db.add(db_event)
-                db.commit()
-                db.close()
-                
-            # Add overlay text for the video stream
-            cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                if new_events:
+                    db = SessionLocal()
+                    try:
+                        for event in new_events:
+                            db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
+                            db.add(db_event)
+                        db.commit()
+                    except Exception as db_e:
+                        print(f"Database error in stream: {db_e}")
+                    finally:
+                        db.close()
+                    
+                cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-            ret, buffer = cv2.imencode('.jpg', annotated_frame)
-            if not ret: continue
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                   
-        cap.release()
-        try: os.remove(tfile.name)
-        except: pass
+                ret, buffer = cv2.imencode('.jpg', annotated_frame)
+                if not ret: continue
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        finally:
+            cap.release()
+            try: os.remove(tfile.name)
+            except: pass
 
     return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 

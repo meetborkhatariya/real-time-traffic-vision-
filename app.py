@@ -43,14 +43,14 @@ with st.sidebar:
     st.subheader("⚙️ Backend Intelligence")
     api_online = False
     try:
-        res = requests.get(f"{API_URL}/")
+        res = requests.get(f"{API_URL}/", timeout=5)
         if res.status_code == 200:
             st.success("API Engine: ONLINE 🟢")
             api_online = True
             current_model = res.json().get("model", "Unknown")
         else:
             st.warning("API Engine: UNSTABLE 🟡")
-    except requests.ConnectionError:
+    except (requests.ConnectionError, requests.Timeout):
         st.error("API Engine: OFFLINE 🔴")
         
     st.markdown("---")
@@ -68,7 +68,7 @@ with st.sidebar:
     if st.button("Switch Backend Model"):
         if api_online:
             with st.spinner("Instructing backend to switch weights..."):
-                r = requests.post(f"{API_URL}/api/config/model", json={"model_name": model_map[model_choice]})
+                r = requests.post(f"{API_URL}/api/config/model", json={"model_name": model_map[model_choice]}, timeout=30)
                 if r.status_code == 200:
                     st.success("Model updated successfully!")
         else:
@@ -83,7 +83,7 @@ with st.sidebar:
 
     if api_online:
         try:
-            stats = requests.get(f"{API_URL}/api/analytics/summary").json()
+            stats = requests.get(f"{API_URL}/api/analytics/summary", timeout=10).json()
             total = stats.get("total_crossed", 0)
             breakdown = stats.get("breakdown", {})
             st.metric("Total Vehicles Handled via API", total)
@@ -94,7 +94,7 @@ with st.sidebar:
                 
             st.markdown("---")
             st.write("**Raw Database Logs (Last 50):**")
-            raw_data = requests.get(f"{API_URL}/api/analytics/data").json()
+            raw_data = requests.get(f"{API_URL}/api/analytics/data", timeout=10).json()
             if raw_data:
                 raw_df = pd.DataFrame(raw_data)
                 # Format time for readability
@@ -121,9 +121,10 @@ def play_mjpeg_stream(url, method="post", kwargs=None):
     try:
         kwargs = kwargs or {}
         kwargs["stream"] = True
+        kwargs["timeout"] = 30 # Initial connection timeout
         response = requests.request(method, url, **kwargs)
         bytes_data = bytes()
-        for chunk in response.iter_content(chunk_size=4096):
+        for chunk in response.iter_content(chunk_size=16384): # Increased chunk size
             if stop_btn: break
             bytes_data += chunk
             a = bytes_data.find(b'\xff\xd8')
@@ -144,7 +145,7 @@ with tab1:
         if st.button("Send to Deep Learning API"):
             with st.spinner("Processing in cloud..."):
                 file_obj = {"file": (up_img.name, up_img.getvalue(), up_img.type)}
-                r = requests.post(f"{API_URL}/api/image/process?conf={conf_threshold}", files=file_obj)
+                r = requests.post(f"{API_URL}/api/image/process?conf={conf_threshold}", files=file_obj, timeout=60)
                 if r.status_code == 200:
                     data = r.json()
                     st.success(f"Detections Finished: {data['count']} vehicles.")
