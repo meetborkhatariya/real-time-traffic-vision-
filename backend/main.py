@@ -161,46 +161,55 @@ class VideoUrl(BaseModel):
 @app.post("/api/video/stream_url")
 async def process_video_url(payload: VideoUrl):
     def generate_frames():
+        print(f"Connecting to URL: {payload.url}")
         cap = cv2.VideoCapture(payload.url)
         if not cap.isOpened():
+            print(f"Failed to open video URL: {payload.url}")
             yield b""
             return
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         line_y = height // 2
         crossed_ids = set()
         track_history = {}
         
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-            annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=payload.conf)
-            if new_events:
-                db = SessionLocal()
-                for event in new_events:
-                    db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
-                    db.add(db_event)
-                db.commit()
-                db.close()
-            
-            cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            ret, buffer = cv2.imencode('.jpg', annotated_frame)
-            if not ret: continue
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        cap.release()
+        try:
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret: break
+                annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=payload.conf)
+                if new_events:
+                    db = SessionLocal()
+                    try:
+                        for event in new_events:
+                            db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
+                            db.add(db_event)
+                        db.commit()
+                    except Exception as e:
+                        print(f"DB Error in URL stream: {e}")
+                    finally:
+                        db.close()
+                
+                cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                ret, buffer = cv2.imencode('.jpg', annotated_frame)
+                if not ret: continue
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        finally:
+            cap.release()
     return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 @app.get("/api/video/webcam")
 async def process_webcam(conf: float = 0.35):
     """Accesses local webcam 0 mapping from the backend layer."""
     def generate_frames():
+        print("Opening backend webcam...")
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
+            print("Webcam 0 not available on backend server.")
             yield b""
             return
             
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         line_y = height // 2
         crossed_ids = set()
@@ -213,12 +222,16 @@ async def process_webcam(conf: float = 0.35):
                 annotated_frame, curr_count, density, new_events = vision_service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
                 if new_events:
                     db = SessionLocal()
-                    for event in new_events:
-                        db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
-                        db.add(db_event)
-                    db.commit()
-                    db.close()
-                    
+                    try:
+                        for event in new_events:
+                            db_event = TrafficEvent(vehicle_type=event["vehicle_type"], track_id=event["track_id"], direction="crossing")
+                            db.add(db_event)
+                        db.commit()
+                    except Exception as e:
+                        print(f"DB Error in Webcam stream: {e}")
+                    finally:
+                        db.close()
+                        
                 cv2.putText(annotated_frame, f"Density: {density} | Session Crossed: {len(crossed_ids)}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 ret, buffer = cv2.imencode('.jpg', annotated_frame)
                 if not ret: continue
