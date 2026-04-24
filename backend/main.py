@@ -50,6 +50,10 @@ class ModelConfig(BaseModel):
 class VideoUrl(BaseModel):
     url: str
 
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
+
 @app.get("/")
 def read_root():
     try:
