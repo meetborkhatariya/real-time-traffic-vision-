@@ -44,11 +44,17 @@ with st.sidebar:
     api_online = False
     try:
         res = requests.get(f"{API_URL}/ping", timeout=15)
+        # If /ping is not found, try the root endpoint as a fallback
+        if res.status_code == 404:
+            res = requests.get(f"{API_URL}/", timeout=15)
+            
         if res.status_code == 200:
             st.success("API Engine: ONLINE 🟢")
             api_online = True
             try:
-                current_model = res.json().get("model", "Unknown")
+                # The root endpoint returns JSON, /ping might just be status: ok
+                data = res.json()
+                current_model = data.get("model", "Unknown")
             except:
                 current_model = "Unknown"
         else:
