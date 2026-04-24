@@ -9,13 +9,14 @@ class VisionService:
         self.vehicle_classes = [1, 2, 3, 5, 7] # bicycle, car, motorcycle, bus, truck
 
     def _load_model(self, model_path):
-        # Assumes models might be downloaded locally or uses YOLO ultralytics defaults
         try:
             self.model = YOLO(model_path)
-            print(f"Loaded model {model_path} successfully.")
+            self.model.to('cpu') # Force CPU
+            print(f"Loaded model {model_path} successfully on CPU.")
         except Exception as e:
-            print(f"Failed to load {model_path}, falling back to yolov8n.pt")
+            print(f"Failed to load {model_path}, falling back to yolov8n.pt: {e}")
             self.model = YOLO("yolov8n.pt")
+            self.model.to('cpu')
 
     def switch_model(self, model_name):
         if model_name != self.current_model_name:
@@ -24,15 +25,19 @@ class VisionService:
 
     def process_image(self, img_np, conf_threshold=0.35):
         """Processes a single static image with downscaling optimization."""
+        print("Starting process_image...")
         # 1. Downscale if too large to save latency and memory
         h, w = img_np.shape[:2]
         max_dim = 1080
         if max(h, w) > max_dim:
             scale = max_dim / max(h, w)
-            img_np = cv2.resize(img_np, (int(w * scale), int(h * scale)))
+            img_np = cv2.resize(img_np, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            print(f"Resized image to {img_np.shape}")
 
         # 2. Run inference
-        results = self.model(img_np, conf=conf_threshold, classes=self.vehicle_classes, verbose=False)
+        print(f"Running inference with conf={conf_threshold}...")
+        results = self.model(img_np, conf=conf_threshold, classes=self.vehicle_classes, device='cpu', verbose=False)
+        print("Inference finished.")
         
         # 3. Generate annotated image
         annotated_img = results[0].plot()

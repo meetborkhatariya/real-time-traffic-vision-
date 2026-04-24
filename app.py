@@ -158,14 +158,19 @@ with tab1:
                 img_bytes = buf.getvalue()
 
                 file_obj = {"file": (up_img.name, img_bytes, "image/jpeg")}
-                r = requests.post(f"{API_URL}/api/image/process?conf={conf_threshold}", files=file_obj, timeout=60)
-                if r.status_code == 200:
-                    data = r.json()
-                    st.success(f"Detections Finished: {data['count']} vehicles.")
-                    img_bytes_res = base64.b64decode(data['image'])
-                    st.image(Image.open(io.BytesIO(img_bytes_res)), caption="API Processed Result", use_column_width=True)
-                else:
-                    st.error(f"API Error ({r.status_code}): {r.text}")
+                try:
+                    r = requests.post(f"{API_URL}/api/image/process?conf={conf_threshold}", files=file_obj, timeout=120)
+                    if r.status_code == 200:
+                        data = r.json()
+                        st.success(f"Detections Finished: {data['count']} vehicles.")
+                        img_bytes_res = base64.b64decode(data['image'])
+                        st.image(Image.open(io.BytesIO(img_bytes_res)), caption="API Processed Result", use_column_width=True)
+                    else:
+                        st.error(f"API Error ({r.status_code}): {r.text}")
+                except requests.exceptions.ReadTimeout:
+                    st.error("⏰ The API took too long to respond (Timeout). This usually happens if the backend is waking up or processing a complex image. Please try again in a moment.")
+                except Exception as e:
+                    st.error(f"❌ An unexpected error occurred: {e}")
 
 # Video Upload
 with tab2:
