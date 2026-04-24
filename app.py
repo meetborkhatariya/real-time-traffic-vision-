@@ -73,7 +73,6 @@ with st.sidebar:
     model_map = {
         "Fast (YOLOv8n)": "yolov8n.pt",
         "Balanced (YOLOv8s)": "yolov8s.pt",
-        "Precise (YOLOv8m)": "yolov8m.pt",
         "Ultra Precise (YOLOv8l)": "yolov8l.pt"
     }
     
