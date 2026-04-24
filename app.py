@@ -43,7 +43,7 @@ with st.sidebar:
     st.subheader("⚙️ Backend Intelligence")
     api_online = False
     try:
-        res = requests.get(f"{API_URL}/", timeout=5)
+        res = requests.get(f"{API_URL}/", timeout=15)
         if res.status_code == 200:
             st.success("API Engine: ONLINE 🟢")
             api_online = True
