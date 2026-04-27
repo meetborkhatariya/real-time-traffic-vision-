@@ -132,14 +132,27 @@ tab1, tab2, tab3, tab4 = st.tabs([
 def play_mjpeg_stream(url, method="post", kwargs=None):
     st_frame = st.empty()
     stop_btn = st.button("🛑 Stop Stream")
+    with st.spinner("Connecting to backend... (Render may need ~30–60s to wake up)"):
+        try:
+            kwargs = kwargs or {}
+            kwargs["stream"] = True
+            kwargs["timeout"] = 90  # Allow time for Render cold start
+            response = requests.request(method, url, **kwargs)
+        except requests.Timeout:
+            st.warning("⏳ The backend timed out while waking up. Please wait 30 seconds and try again.")
+            return
+        except requests.ConnectionError:
+            st.error("❌ Cannot reach the backend. Check your internet or Render deployment status.")
+            return
+        except Exception as e:
+            st.error(f"❌ Unexpected error: {e}")
+            return
+
+    bytes_data = bytes()
     try:
-        kwargs = kwargs or {}
-        kwargs["stream"] = True
-        kwargs["timeout"] = 30 # Initial connection timeout
-        response = requests.request(method, url, **kwargs)
-        bytes_data = bytes()
-        for chunk in response.iter_content(chunk_size=16384): # Increased chunk size
-            if stop_btn: break
+        for chunk in response.iter_content(chunk_size=16384):
+            if stop_btn:
+                break
             bytes_data += chunk
             a = bytes_data.find(b'\xff\xd8')
             b = bytes_data.find(b'\xff\xd9')
@@ -148,7 +161,7 @@ def play_mjpeg_stream(url, method="post", kwargs=None):
                 bytes_data = bytes_data[b+2:]
                 st_frame.image(jpg, use_column_width=True)
     except Exception as e:
-        st.error(f"Failed to connect: {e}")
+        st.error(f"❌ Stream interrupted: {e}")
 
 # Restored Image Tab via API
 with tab1:
