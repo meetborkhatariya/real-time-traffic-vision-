@@ -69,7 +69,14 @@ class VisionService:
         return annotated_img, count, types
 
     def process_frame(self, frame, line_y, crossed_ids, track_history, conf_threshold=0.35):
-        """Processes video frame for tracking using Vector State-Machine."""
+        """Processes video frame for tracking with downscaling optimization."""
+        # Downscale for faster processing on CPU
+        h, w = frame.shape[:2]
+        if w > 640:
+            scale = 640 / w
+            frame = self.cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=self.cv2.INTER_AREA)
+            line_y = int(line_y * scale)
+
         results = self.model.track(frame, classes=self.vehicle_classes, persist=True, conf=conf_threshold, verbose=False)
         boxes = results[0].boxes
         curr_count = len(boxes)

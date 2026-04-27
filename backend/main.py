@@ -17,7 +17,7 @@ _vision_service = None
 @asynccontextmanager
 async def lifespan(app):
     """Fast startup: model loading is now lazy to avoid Render timeouts."""
-    print("🚀 Server starting (Fast Mode)...")
+    print("Server starting (Fast Mode)...")
     yield
     print("Server shutting down.")
 
@@ -34,7 +34,7 @@ app.add_middleware(
 def get_vision_service():
     global _vision_service
     if _vision_service is None:
-        print("Model not loaded yet — loading now...")
+        print("Model not loaded yet -- loading now...")
         try:
             _vision_service = VisionService(model_path="yolov8n.pt")
         except Exception as e:
@@ -152,10 +152,14 @@ async def process_video_stream(file: UploadFile = File(...), conf: float = 0.35)
         crossed_ids = set()
         track_history = {}
         
+        frame_count = 0
         try:
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
+                
+                frame_count += 1
+                if frame_count % 4 != 0: continue # Process every 4th frame for Render CPU
                     
                 service = get_vision_service()
                 annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
@@ -205,10 +209,15 @@ async def process_video_url(payload: VideoUrl):
         crossed_ids = set()
         track_history = {}
         
+        frame_count = 0
         try:
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
+                
+                frame_count += 1
+                if frame_count % 4 != 0: continue
+                
                 service = get_vision_service()
                 annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=payload.conf)
                 if new_events:
@@ -249,10 +258,15 @@ async def process_webcam(conf: float = 0.35):
         crossed_ids = set()
         track_history = {}
         
+        frame_count = 0
         try:
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
+                
+                frame_count += 1
+                if frame_count % 4 != 0: continue
+                
                 service = get_vision_service()
                 annotated_frame, curr_count, density, new_events = service.process_frame(frame, line_y, crossed_ids, track_history, conf_threshold=conf)
                 if new_events:
