@@ -42,36 +42,28 @@ with st.sidebar:
     
     st.subheader("⚙️ Backend Intelligence")
     api_online = False
-    with st.spinner("Connecting to API engine... (may take ~30s on cold start)"):
+    with st.spinner("Connecting to API engine... (Render cold starts take ~45–90s)"):
         try:
-            res = requests.get(f"{API_URL}/ping", timeout=60)
-            # If /ping is not found, try the root endpoint as a fallback
+            # Increase timeout to 120s for Render free tier
+            res = requests.get(f"{API_URL}/ping", timeout=120)
             if res.status_code == 404:
-                res = requests.get(f"{API_URL}/", timeout=60)
+                res = requests.get(f"{API_URL}/", timeout=120)
 
             if res.status_code == 200:
                 st.success("API Engine: ONLINE 🟢")
                 api_online = True
-                try:
-                    data = res.json()
-                    current_model = data.get("model", "Unknown")
-                except:
-                    current_model = "Unknown"
             else:
-                try:
-                    error_msg = res.json().get("message", f"Status {res.status_code}")
-                except:
-                    error_msg = f"Status {res.status_code}: {res.text[:100]}"
-                st.error(f"API Engine: ERROR 🔴\n\n{error_msg}")
+                st.error(f"API Engine: ERROR 🔴 (Status {res.status_code})")
         except requests.Timeout:
-            st.warning("⏳ API Engine is waking up on Render. Refresh the page in ~30 seconds.")
-        except requests.ConnectionError:
+            st.warning("⏳ API is waking up. Render's free tier spins down after 15m. Please refresh in 30s.")
+        except Exception as e:
             st.error("API Engine: OFFLINE 🔴")
+            st.info("Ensure the Render backend is deployed and not crashing due to RAM limits.")
         
     st.markdown("---")
     
-    # Restored Model Selection
     st.subheader("🧠 Model Version")
+    st.caption("⚠️ Render Free Tier has 512MB RAM. Avoid 'Ultra Precise' if the API crashes.")
     model_map = {
         "Fast (YOLOv8n)": "yolov8n.pt",
         "Balanced (YOLOv8s)": "yolov8s.pt",

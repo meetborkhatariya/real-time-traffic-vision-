@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,17 @@ import base64
 from database import SessionLocal, TrafficEvent
 from vision_core import VisionService
 
-app = FastAPI(title="VisionFlow AI Backend", version="1.0")
+# Global vision service instance
+_vision_service = None
+
+@asynccontextmanager
+async def lifespan(app):
+    """Fast startup: model loading is now lazy to avoid Render timeouts."""
+    print("🚀 Server starting (Fast Mode)...")
+    yield
+    print("Server shutting down.")
+
+app = FastAPI(title="VisionFlow AI Backend", version="1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,13 +34,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global vision service instance
-_vision_service = None
-
 def get_vision_service():
     global _vision_service
     if _vision_service is None:
-        print("Initializing VisionService for the first time...")
+        print("Model not loaded yet — loading now...")
         try:
             _vision_service = VisionService(model_path="yolov8n.pt")
         except Exception as e:

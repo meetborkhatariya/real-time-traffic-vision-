@@ -1,6 +1,8 @@
 import cv2
 from ultralytics import YOLO
 import os
+import gc
+import torch
 
 class VisionService:
     def __init__(self, model_path="yolov8n.pt"):
@@ -10,8 +12,16 @@ class VisionService:
 
     def _load_model(self, model_path):
         try:
+            # Clear old model from memory before loading new one
+            if hasattr(self, 'model'):
+                del self.model
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            print(f"Loading {model_path}...")
             self.model = YOLO(model_path)
-            self.model.to('cpu') # Force CPU
+            self.model.to('cpu') 
             print(f"Loaded model {model_path} successfully on CPU.")
         except Exception as e:
             print(f"Failed to load {model_path}, falling back to yolov8n.pt: {e}")
@@ -20,8 +30,10 @@ class VisionService:
 
     def switch_model(self, model_name):
         if model_name != self.current_model_name:
+            print(f"Switching model: {self.current_model_name} -> {model_name}")
             self._load_model(model_name)
             self.current_model_name = model_name
+            gc.collect()
 
     def process_image(self, img_np, conf_threshold=0.35):
         """Processes a single static image with downscaling optimization."""
