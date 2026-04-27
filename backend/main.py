@@ -3,12 +3,9 @@ from fastapi import FastAPI, File, UploadFile, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import cv2
 import tempfile
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-import os
-import numpy as np
 import base64
 
 from database import SessionLocal, TrafficEvent
@@ -101,6 +98,8 @@ def get_analytics_data(db: Session = Depends(get_db)):
 @app.post("/api/image/process")
 async def process_image(file: UploadFile = File(...), conf: float = 0.35, db: Session = Depends(get_db)):
     """Process a single image and return base64 string."""
+    import cv2
+    import numpy as np
     try:
         contents = await file.read()
         nparr = np.frombuffer(contents, np.uint8)
@@ -141,6 +140,7 @@ async def process_video_stream(file: UploadFile = File(...), conf: float = 0.35)
         return JSONResponse(status_code=500, content={"error": f"Upload failed: {e}"})
     
     def generate_frames():
+        import cv2
         cap = cv2.VideoCapture(tfile.name)
         if not cap.isOpened():
             print(f"Failed to open video file: {tfile.name}")
@@ -192,6 +192,7 @@ class VideoUrl(BaseModel):
 @app.post("/api/video/stream_url")
 async def process_video_url(payload: VideoUrl):
     def generate_frames():
+        import cv2
         print(f"Connecting to URL: {payload.url}")
         cap = cv2.VideoCapture(payload.url)
         if not cap.isOpened():
@@ -235,6 +236,7 @@ async def process_video_url(payload: VideoUrl):
 async def process_webcam(conf: float = 0.35):
     """Accesses local webcam 0 mapping from the backend layer."""
     def generate_frames():
+        import cv2
         print("Opening backend webcam...")
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():

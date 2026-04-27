@@ -1,11 +1,16 @@
-import cv2
-from ultralytics import YOLO
 import os
 import gc
-import torch
 
 class VisionService:
     def __init__(self, model_path="yolov8n.pt"):
+        # Import heavy libraries inside __init__ to avoid blocking main API startup
+        import cv2
+        from ultralytics import YOLO
+        import torch
+        self.cv2 = cv2
+        self.YOLO = YOLO
+        self.torch = torch
+        
         self.current_model_name = model_path
         self._load_model(model_path)
         self.vehicle_classes = [1, 2, 3, 5, 7] # bicycle, car, motorcycle, bus, truck
@@ -16,16 +21,16 @@ class VisionService:
             if hasattr(self, 'model'):
                 del self.model
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            if self.torch.cuda.is_available():
+                self.torch.cuda.empty_cache()
 
             print(f"Loading {model_path}...")
-            self.model = YOLO(model_path)
+            self.model = self.YOLO(model_path)
             self.model.to('cpu') 
             print(f"Loaded model {model_path} successfully on CPU.")
         except Exception as e:
             print(f"Failed to load {model_path}, falling back to yolov8n.pt: {e}")
-            self.model = YOLO("yolov8n.pt")
+            self.model = self.YOLO("yolov8n.pt")
             self.model.to('cpu')
 
     def switch_model(self, model_name):
@@ -43,7 +48,7 @@ class VisionService:
         max_dim = 1080
         if max(h, w) > max_dim:
             scale = max_dim / max(h, w)
-            img_np = cv2.resize(img_np, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            img_np = self.cv2.resize(img_np, (int(w * scale), int(h * scale)), interpolation=self.cv2.INTER_AREA)
             print(f"Resized image to {img_np.shape}")
 
         # 2. Run inference
@@ -96,6 +101,6 @@ class VisionService:
                 track_history[track_id] = cy
 
         annotated_frame = results[0].plot()
-        cv2.line(annotated_frame, (0, line_y), (frame.shape[1], line_y), (0, 0, 255), 3)
+        self.cv2.line(annotated_frame, (0, line_y), (frame.shape[1], line_y), (0, 0, 255), 3)
         
         return annotated_frame, curr_count, density, new_crossed_events
