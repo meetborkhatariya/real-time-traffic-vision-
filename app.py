@@ -42,29 +42,31 @@ with st.sidebar:
     
     st.subheader("⚙️ Backend Intelligence")
     api_online = False
-    try:
-        res = requests.get(f"{API_URL}/ping", timeout=15)
-        # If /ping is not found, try the root endpoint as a fallback
-        if res.status_code == 404:
-            res = requests.get(f"{API_URL}/", timeout=15)
-            
-        if res.status_code == 200:
-            st.success("API Engine: ONLINE 🟢")
-            api_online = True
-            try:
-                # The root endpoint returns JSON, /ping might just be status: ok
-                data = res.json()
-                current_model = data.get("model", "Unknown")
-            except:
-                current_model = "Unknown"
-        else:
-            try:
-                error_msg = res.json().get("message", f"Status {res.status_code}")
-            except:
-                error_msg = f"Status {res.status_code}: {res.text[:100]}"
-            st.error(f"API Engine: ERROR 🔴\n\n{error_msg}")
-    except (requests.ConnectionError, requests.Timeout):
-        st.error("API Engine: OFFLINE 🔴")
+    with st.spinner("Connecting to API engine... (may take ~30s on cold start)"):
+        try:
+            res = requests.get(f"{API_URL}/ping", timeout=60)
+            # If /ping is not found, try the root endpoint as a fallback
+            if res.status_code == 404:
+                res = requests.get(f"{API_URL}/", timeout=60)
+
+            if res.status_code == 200:
+                st.success("API Engine: ONLINE 🟢")
+                api_online = True
+                try:
+                    data = res.json()
+                    current_model = data.get("model", "Unknown")
+                except:
+                    current_model = "Unknown"
+            else:
+                try:
+                    error_msg = res.json().get("message", f"Status {res.status_code}")
+                except:
+                    error_msg = f"Status {res.status_code}: {res.text[:100]}"
+                st.error(f"API Engine: ERROR 🔴\n\n{error_msg}")
+        except requests.Timeout:
+            st.warning("⏳ API Engine is waking up on Render. Refresh the page in ~30 seconds.")
+        except requests.ConnectionError:
+            st.error("API Engine: OFFLINE 🔴")
         
     st.markdown("---")
     
